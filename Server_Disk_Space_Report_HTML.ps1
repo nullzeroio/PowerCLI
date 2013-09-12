@@ -46,7 +46,7 @@ $msg = new-object Net.Mail.MailMessage
 $smtp = new-object Net.Mail.SmtpClient($smtpServer)
 $msg.From = $Sender
 $msg.BCC.Add($Recipients)
-$msg.Subject = â€œServer Disk Usage Reportâ€
+$msg.Subject = "Server Disk Usage Report"
 $msg.Body ="The most recent Server Disk Space report has been posted at the following URL: http:// "
 #$msg.Attachments.Add($att)
 $smtp.Send($msg)
