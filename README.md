@@ -1,4 +1,4 @@
 PowerCLI
 ========
 
-vMotioned.com PowerCLI Scripts
+PowerCLI Scripts
