@@ -76,7 +76,7 @@ Process {
 		$bootTime = ($VMHost | Get-View).runtime.boottime
 		$calcUptime = ((Get-Date) - $bootTime)
 		
-		# Create custom object to store host/vib information - use 'automatic foreach' notation (.) to call the detail for each property
+		# Create custom object to store host/vib information
 		$objHpVib = [PSCustomObject] @{
 			Host = $_.Name
 			VibName = $softwareList.Name
