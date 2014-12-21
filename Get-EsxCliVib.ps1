@@ -7,7 +7,8 @@
 	This can be usefule if you are looking for version information about a given package on an ESXi host.
 
 	This script/function is best utilized when sending a host object to it via the pipeline; see examples for more detail.
-.INPUT VMware.VimAutomation.ViCore.Impl.V1.Inventory.VMHostImpl
+.INPUTS
+	VMware.VimAutomation.ViCore.Impl.V1.Inventory.VMHostImpl
 .PARAMETER VMHost
 	Name of ESXi host
 .PARAMETER VIBName
@@ -43,7 +44,7 @@ param
 			   ValueFromPipelineByPropertyName = $true,
 			   Position = 0)]
 	[VMware.VimAutomation.ViCore.Impl.V1.Inventory.VMHostImpl]$VMHost,
-
+	
 	[Parameter(Mandatory = $true,
 			   ValueFromPipeline = $false,
 			   ValueFromPipelineByPropertyName = $false,
@@ -51,33 +52,32 @@ param
 	[string]$VIBName
 )
 
-Begin
-{
+Begin {
 	#Requires -Version 3
-	#Requires -PSSnapin VMware.VimAutomation.Core
-
-		# clear/set final $result variable
+	
+	# clear/set final $result variable
 	$result = @()
 }# begin
 
-Process
-{
-
-	try
-	{
+Process {
+	
+	try {
 		Write-Verbose -Message "Working on $($_.Name)..."
-			# Clear/set variables
-		$colHpVib = @()
+		
+		# Clear/set variables
 		$esxcli = $null
 		$softwareList = $null
-			# Assign vmhost query objects to a variable to be called later
+		
+		# Assign vmhost query objects to a variable to be called later
 		$esxcli = Get-EsxCli -VMHost $VMHost
-		$softwareList = $esxcli.software.vib.list() | Where-Object { $_.Name -eq 'hp-ams' }
-			# get uptime details
+		$softwareList = $esxcli.software.vib.list() | Where-Object { $_.Name -like "$VIBName" }
+		
+		# get uptime details
 		$bootTime = ($VMHost | Get-View).runtime.boottime
 		$calcUptime = ((Get-Date) - $bootTime)
-			# Create custom object to store host/vib information - use 'automatic foreach' notation (.) to call the detail for each property
-		$objHpVib = New-Object -TypeName psobject -Property @{
+		
+		# Create custom object to store host/vib information - use 'automatic foreach' notation (.) to call the detail for each property
+		$objHpVib = [PSCustomObject] @{
 			Host = $_.Name
 			VibName = $softwareList.Name
 			VibVersion = $softwareList.Version
@@ -92,33 +92,28 @@ Process
 			HostMfg = $_.Manufacturer
 			HostModel = $_.Model
 		}# $objHpVib
-
-			# Assign current object data to temporary collection array variable
-		$colHpVib += $objHpVib
-			# Send collection detail for current object to the final $result variable
-		$result += $colHpVib
-	} catch
-	{
-			# Write a warning to the console if errors are encountered
+		
+		# Send collection detail for current object to the final $result variable
+		$result += $objHpVib
+	} catch {
 		Write-Warning -Message "Error gathering detail from $VMHost"
-			# clear/set the $colError array
+		
+		# clear/set the $colError array
 		$colError = @()
-			# create new object to store error detail
+		
+		# create new object to store error detail
 		$objError = New-Object -TypeName psobject -Property @{
 			Host = $_.Name
 			Status = "$_"
 		}# $objError
-
-			# assign current object data to temp. error collection array variable
-		$colError += $objError
-			# send collection detail to final $result variable
-		$result += $colError
-
+		
+		# send collection detail to final $result variable
+		$result += $objError
+		
 	}# try/catch
 }# process
 
-End
-{
-		# call final result and define a custom order - output from the console can be formatted using regular export cmdlets (Export-Csv; Out-Gridview; Format-Table; etc.)
-	$result | Select-Object Host, VibName, VibVersion, VibVendor, VibInstallDate, VibID, VibCreationDate, VibStatus, HostUptimeDays, HostVersion, HostVersionBuild, HostMfg, HostModel
+End {
+	# call final result - output from the console can be formatted using regular export cmdlets (Export-Csv; Out-Gridview; Format-Table; etc.)
+	$result 
 }# end
