@@ -31,9 +31,26 @@ HostVersionBuild : 1892794
 HostMfg          : HP
 HostModel        : ProLiant BL460c Gen8
 
-.NOTES
-	20141002	K. Kirkpatrick		[+] Created
-	20141003	K. Kirkpatrick		[+] Added CBH (comment based help)
+.NOTES	
+
+	#TAG:PUBLIC
+	
+	GitHub:	 https://github.com/vN3rd
+	Twitter:  @vN3rd
+	Email:	 kevin@pinelabs.co
+
+[-------------------------------------DISCLAIMER-------------------------------------]
+ All script are provided as-is with no implicit
+ warranty or support. It's always considered a best practice
+ to test scripts in a DEV/TEST environment, before running them
+ in production. In other words, I will not be held accountable
+ if one of my scripts is responsible for an RGE (Resume Generating Event).
+ If you have questions or issues, please reach out/report them on
+ my GitHub page. Thanks for your support!
+[-------------------------------------DISCLAIMER-------------------------------------]
+
+.LINK
+	https://github.com/vN3rd
 #>
 
 [CmdletBinding(DefaultParameterSetName = 'Default',
@@ -52,14 +69,14 @@ param
 	[string]$VIBName
 )
 
-Begin {
+BEGIN {
 	#Requires -Version 3
 	
 	# clear/set final $result variable
 	$result = @()
-}# begin
+} # BEGIN
 
-Process {
+PROCESS {
 	
 	try {
 		Write-Verbose -Message "Working on $($_.Name)..."
@@ -68,6 +85,9 @@ Process {
 		$esxcli = $null
 		$softwareList = $null
 		
+		# Ignore verbose output until Get-EsxCli and Get-View cmdlets are finished running
+		$VerbosePreference = [System.Management.Automation.ActionPreference]::SilentlyContinue
+		
 		# Assign vmhost query objects to a variable to be called later
 		$esxcli = Get-EsxCli -VMHost $VMHost
 		$softwareList = $esxcli.software.vib.list() | Where-Object { $_.Name -like "$VIBName" }
@@ -75,6 +95,8 @@ Process {
 		# get uptime details
 		$bootTime = ($VMHost | Get-View).runtime.boottime
 		$calcUptime = ((Get-Date) - $bootTime)
+		
+		$VerbosePreference = [System.Management.Automation.ActionPreference]::Continue
 		
 		# Create custom object to store host/vib information
 		$objHpVib = [PSCustomObject] @{
@@ -91,7 +113,7 @@ Process {
 			HostVersionBuild = $_.Build
 			HostMfg = $_.Manufacturer
 			HostModel = $_.Model
-		}# $objHpVib
+		} # $objHpVib
 		
 		# Send collection detail for current object to the final $result variable
 		$result += $objHpVib
@@ -110,10 +132,10 @@ Process {
 		# send collection detail to final $result variable
 		$result += $objError
 		
-	}# try/catch
-}# process
+	} # try/catch
+} # PROCESS
 
-End {
+END {
 	# call final result - output from the console can be formatted using regular export cmdlets (Export-Csv; Out-Gridview; Format-Table; etc.)
-	$result 
-}# end
+	$result
+} # END
