@@ -99,7 +99,7 @@ BEGIN {
 			Write-Warning -Message "Error adding VMware PSSnapin: $_"
 			Write-Warning -Message 'Exiting script'
 			Exit
-		} # end try/catch
+		} # try/catch
 	} else {
 		
 		Write-Verbose -Message "VMware.VimAutomation.Core PSSnapin is already added; continuing..."
@@ -115,16 +115,16 @@ BEGIN {
 			Write-Warning -Message 'Error connecting to vCenter'
 			Write-Warning -Message 'Exiting script'
 			Exit
-		} # end try/catch		
+		} # end try/catch
 	} elseif (($global:defaultviserver).Name -eq $null) {
 		Write-Warning -Message 'No default vCenter connection. Connect to vCenter or specify a vCenter Server name and try again.'
 		Write-Warning -Message 'Exiting script'
 		Exit
 	} else {
-		$VIServer = $global:defaultviserver		
+		$VIServer = $global:defaultviserver
 	} # end if/else
 	
-}# end BEGIN
+}# BEGIN
 
 PROCESS {
 	
@@ -174,14 +174,21 @@ PROCESS {
 			$diskInfo = $vmDetail.Guest.Disk
 			
 			foreach ($disk in $diskInfo) {
-				
-				$diskCapacity = $disk.Capacity / 1GB
-				$diskSpaceUsed = ($disk.Capacity - $disk.FreeSpace) / 1GB
-				$diskSpaceFree = $disk.FreeSpace / 1GB
-				$diskPercentFree = ($disk.FreeSpace / $disk.Capacity) * 100
+				if ($disk.Capacity -eq 0) {
+					Write-Warning -Message "Disk capacity is zero; zeroing all values for the $($disk.Diskpath) partition on $($vm.name)"
+					$diskCapacity = 0
+					$diskSpaceUsed = 0
+					$diskSpaceFree = 0
+					$diskPercentFree = 0
+				} else {
+					$diskCapacity = $disk.Capacity / 1GB
+					$diskSpaceUsed = ($disk.Capacity - $disk.FreeSpace) / 1GB
+					$diskSpaceFree = $disk.FreeSpace / 1GB
+					$diskPercentFree = ($disk.FreeSpace / $disk.Capacity) * 100
+				} # end if/else
 				
 				$objGuestDisk = [PSCustomObject] @{
-					Name = $vmDetail.Name
+					Name = $vm.Name
 					Partition = $disk.DiskPath
 					CapacityInGB = $diskCapacity
 					SpaceUsedInGB = $diskSpaceUsed
@@ -196,7 +203,7 @@ PROCESS {
 		Write-Warning -Message "Error Gathering Details - $_"
 	} # end try/catch
 	
-} # end PROCESS
+}# end PROCESS
 
 END {
 	Write-Verbose -Message 'Done'
