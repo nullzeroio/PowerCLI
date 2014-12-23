@@ -4,29 +4,50 @@
 .DESCRIPTION
 	This script/function will return individual partition space details for VMware guests operating systems.
 
-	The script/function is geared towards the virtualization administrator that may not have the necessary guest OS credentials or privileges to query partion level disk space details across a heterogeneous guest environment.
+	The script/function is geared towards the virtualization administrator that may not have the necessary guest OS credentials or
+	privileges to query partion level disk space details across a heterogeneous guest environment.
 
-	This script/function pulls the information that is provided by VMware Tools, within the each guest OS. As such, VMware Tools must be installed to query this level of detail via the vSphere API.
+	This script/function pulls the information that is provided by VMware Tools, within the each guest OS. As such, VMware Tools
+	must be installed to query this level of detail via the vSphere API.
 
 	Pipeline input is supported, so you can use it similar to 'Get-DataCenter DC01 | Get-VM | .\Get-VMDiskSpace'.
 
-	The native input format that is required is that of a VI virtual machine (see .INPUTS). Any string values provided will be checked and then attemtpe to be converted to the proper type.
+	The native input format that is required is that of a VI virtual machine (see .INPUTS). Any string values provided will be
+	checked and then an attempt to convert it to the proper type will be made.
 
-	Also included in the output is a 'DatastoreList' property. Since there is no easy/reliable way to correlate: guest partition --> .VMDK --> datastore, the 'DatastoreList' represents all datastores that the guest has
-	a current .VMDK on. In theory, if your datastores had some type of standard naming convension, one might be able to make an educated guess where a partition's .VMDK resides. Either way, you can at least narrow your
+	Also included in the output are 'DatastoreList','VMXPath' and 'DatastoreMapping' properties. Since there is no easy/reliable
+	way to correlate: guest partition --> .VMDK --> datastore, the 'DatastoreList' represents all datastores that the guest has
+	a current .VMDK on. The 'DatastoreMapping' property contains an actual mapping of which .VMDK is sitting on which datastore.
+	The 'VMXPath' property contains the datastore mapping and path to where the .VMX file is located for a partiular guest.
 	search in a larger environment.
 
-	Sample format from '| Format-Table -AutoSize' (See Example 1 for execution details)
+	This script/function will also create a log directory named 'Get-VMDiskSpaceLogs' in the same directory where the script is ran from.
 
-Name     Partition CapacityInGB SpaceUsedInGB SpaceFreeInGB PercentFree DatastoreList
-----     --------- ------------ ------------- ------------- ----------- -------------
-WINSRV01 C:\                 50            12            38          76 nas02_sas_nonrepl_swap, nas01_sata_nonrepl_nfs1
-WINSRV01 D:\                500           419            81          16 nas02_sas_nonrepl_swap, nas01_sata_nonrepl_nfs1
-WINSRV02 C:\                 60            25            34          58 nas01_sata_nonrepl_nfs1
-REDHAT01 /                    8             4             4          49 nas02_sas_nonrepl_swap, nas01_sata_nonrepl_nfs1, nas01_sata_nonrepl_nfs2
-REDHAT01 /boot                0             0             0          65 nas02_sas_nonrepl_swap, nas01_sata_nonrepl_nfs1, nas01_sata_nonrepl_nfs2
-REDHAT01 /sda4               49             5            45          91 nas02_sas_nonrepl_swap, nas01_sata_nonrepl_nfs1, nas01_sata_nonrepl_nfs2
-REDHAT01 /sdb                59             6            53          89 nas02_sas_nonrepl_swap, nas01_sata_nonrepl_nfs1, nas01_sata_nonrepl_nfs2
+	Sample output:
+
+Name             : WINSERVER01
+Cluster          : CLUS1
+VMHost           : prdesxi02.corp.domain
+Partition        : C:\
+CapacityInGB     : 50
+SpaceUsedInGB    : 24
+SpaceFreeInGB    : 26
+PercentFree      : 51
+DatastoreList    : nas01_sata_nonrepl_nfs1, nas01_sata_nonrepl_nfs2
+VMXPath          : [nas01_sata_nonrepl_nfs2] WINSERVER01/WINSERVER01.vmx
+DatastoreMapping : [nas01_sata_nonrepl_nfs2] WINSERVER01/WINSERVER01.vmdk, [nas01_sata_nonrepl_nfs1] WINSERVER01/WINSERVER01_1.vmdk
+
+Name             : WINSERVER01
+Cluster          : CLUS1
+VMHost           : prdesxi02.corp.domain
+Partition        : E:\
+CapacityInGB     : 50
+SpaceUsedInGB    : 26
+SpaceFreeInGB    : 24
+PercentFree      : 47
+DatastoreList    : nas01_sata_nonrepl_nfs1, nas01_sata_nonrepl_nfs2
+VMXPath          : [nas01_sata_nonrepl_nfs2] WINSERVER01/WINSERVER01.vmx
+DatastoreMapping : [nas01_sata_nonrepl_nfs2] WINSERVER01/WINSERVER01.vmdk, [nas01_sata_nonrepl_nfs1] WINSERVER01/WINSERVER01_1.vmdk
 
 .PARAMETER Name
 	Display name of VMware Guest/s
@@ -48,7 +69,10 @@ REDHAT01 /sdb                59             6            53          89 nas02_sa
 .NOTES
 	Author: Kevin Kirkpatrick
 	Last Update: 20141223
-	Last Update Notes: -Added 'DatastoreList' property to output
+	Last Update Notes:
+	- Added 'DatastoreList', 'VMXPath' & 'DatastoreMapping' properties to output
+	- Added logging
+
 
 	#TAG:PUBLIC
 
@@ -88,10 +112,50 @@ param (
 
 BEGIN {
 	<#
+	- define functions
 	- call/set variables
+	- setup logging
 	- Check if the VMware.VimAutomation.Core PSSnapin had been added; if not, attempt to add it
 	- Connect to the provided vCenter Server, if none if provided, check to see if a connection has already been established
 	#>
+
+	$ErrorActionPreference = [System.Management.Automation.ActionPreference]::Stop
+
+	function Get-ScriptDirectory
+	{
+		if($hostinvocation -ne $null)
+		{
+			Split-Path $hostinvocation.MyCommand.path
+		}
+		else
+		{
+			Split-Path $script:MyInvocation.MyCommand.Path
+		}
+	} # end function Get-ScriptDirectory
+
+	function TimeStamp {
+		$dtLogTimeStamp = Get-Date -Format ("[yyyy-MM-dd HH:mm:ss] ")
+		$dtLogTimeStamp
+	} # end function TimeStamp
+
+	$dtScriptStart = Get-Date
+	$dtLogFileName = (Get-Date).ToString("yyyyMMddHHmmss")
+
+	$scriptPath = Get-ScriptDirectory
+	$logDirectory = "$scriptPath\Get-VMDiskSpaceLogs"
+	$log = "$logDirectory\Get-VMDiskSpace_$dtLogFileName.log"
+
+	if (-not (Test-Path -Path $logDirectory)) {
+		try {
+			New-Item -ItemType Directory -Path $scriptPath -Name 'Get-VMDiskSpaceLogs' | Out-Null
+		} catch {
+			Write-Warning -Message "Error creating log directory '$logDirectory'"
+			Write-Warning -Message 'Exiting script'
+			Exit
+		} # end try/catch
+	} # end if/else Test-Path
+
+	Write-Output "======== Get-VMDiskSpace - Started - $(TimeStamp) ========" >> $log
 
 	$colFinalResults = @()
 
@@ -103,6 +167,8 @@ BEGIN {
 		} catch {
 			Write-Warning -Message "Error adding VMware PSSnapin: $_"
 			Write-Warning -Message 'Exiting script'
+			Write-Output "$(TimeStamp) Error: adding PSSnapin - $_" >> $log
+			Write-Output "$(TimeStamp) Error: Exiting script" >> $log
 			Exit
 		} # try/catch
 	} else {
@@ -119,11 +185,15 @@ BEGIN {
 		} catch {
 			Write-Warning -Message 'Error connecting to vCenter'
 			Write-Warning -Message 'Exiting script'
+			Write-Output "$(TimeStamp) Error: connecting to vCenter - $_" >> $log
+			Write-Output "$(TimeStamp) Error: Exiting script" >> $log
 			Exit
 		} # end try/catch
 	} elseif (($global:defaultviserver).Name -eq $null) {
 		Write-Warning -Message 'No default vCenter connection. Connect to vCenter or specify a vCenter Server name and try again.'
 		Write-Warning -Message 'Exiting script'
+		Write-Output "$(TimeStamp) Error: No default vCenter connection. Connect to vCenter or specify a vCenter server name and try again" >> $log
+		Write-Output "$(TimeStamp) Error: Exiting script" >> $log
 		Exit
 	} else {
 		$VIServer = $global:defaultviserver
@@ -148,6 +218,8 @@ PROCESS {
 		} catch {
 			Write-Warning -Message "Error converting $Name to a proper VI object type"
 			Write-Warning -Message 'Exiting script'
+			Write-Output "$(TimeStamp) Error: converting $Name to a proper VI object type" >> $log
+			Write-Output "$(TimeStamp) Error: Exiting script" >> $log
 			Exit
 		} # end try/catch
 	} else {
@@ -166,65 +238,94 @@ PROCESS {
 			[int]$diskPercentFree = $null
 			$vmCurrentDatastores = $null
 			$dsName = $null
+			$dsMap = $null
+			$vmVMXPath = $null
+			$vmHostDetail = $null
 
 			Write-Verbose -Message "Gathering VM details on $($vm.Name)"
+			Write-Output "$(TimeStamp) Info: Gatering VM details on $($vm.Name)" >> $log
 
 			if ($vm.PowerState -eq 'PoweredOff') {
 
-				Write-Warning -Message "$($vm.Name) is PoweredOff"
+				Write-Warning -Message "$($vm.Name) is Powered Off"
+				Write-Output "$(TimeStamp) Warning: $($vm.Name) is Powered Off " >> $log
 
 			} else {
 				$vmDetail = $vm.ExtensionData
-			} # end if/else
 
+				Write-Verbose -Message "Gathering current datastores on $($vm.Name)"
 
-			Write-Verbose -Message "Gathering current datastores on $($vm.Name)"
+				$vmCurrentDatastores = $vmDetail.Config.DatastoreUrl.Name
 
-			$vmCurrentDatastores = $vmDetail.Config.DatastoreUrl.Name
-
-			foreach ($datastore in $vmCurrentDatastores) {
-				$dsName += "$datastore, "
-			} # end foreach
+				foreach ($datastore in $vmCurrentDatastores) {
+					$dsName += "$datastore, "
+				} # end foreach $datastore
 
 			<# In regex, '$' indicates the last charater in a string or before '\n' at the end of a line or string; '.' is wildcard for any single charater except for '\n';
 			"..$" = remove the last two charaters of the string, which would be a comma and one space, in this scenario. #>
-			$dsName = $dsName -replace "..$"
+				$dsName = $dsName -replace "..$"
+
+				Write-Verbose -Message "Gathering .VMDK <--> Datastore mappings for $($vm.Name)"
+
+				$vmDatastoreMap = ($vmDetail.layoutex.file | Where-Object { $_.name -like '*.vmdk' -and $_.name -notlike '*flat*' }).Name
+
+				foreach ($mapping in $vmDatastoreMap) {
+					$dsMap += "$mapping, "
+				} # end foreach $mapping
+
+				$dsMap = $dsMap -replace "..$"
 
 
-			Write-Verbose -Message "Gathering partition details on $($vm.Name)"
+				Write-Verbose -Message "Gathering .VMX path for $($vm.Name)"
 
-			$diskInfo = $vmDetail.Guest.Disk
+				$vmVMXPath = $vmDetail.summary.config.vmpathname
 
-			foreach ($disk in $diskInfo) {
-				if ($disk.Capacity -eq 0) {
-					Write-Warning -Message "Disk capacity is zero; zeroing all values for the $($disk.Diskpath) partition on $($vm.name)"
-					$diskCapacity = 0
-					$diskSpaceUsed = 0
-					$diskSpaceFree = 0
-					$diskPercentFree = 0
-				} else {
-					$diskCapacity = $disk.Capacity / 1GB
-					$diskSpaceUsed = ($disk.Capacity - $disk.FreeSpace) / 1GB
-					$diskSpaceFree = $disk.FreeSpace / 1GB
-					$diskPercentFree = ($disk.FreeSpace / $disk.Capacity) * 100
-				} # end if/else
 
-				$objGuestDisk = [PSCustomObject] @{
-					Name = $vm.Name
-					Partition = $disk.DiskPath
-					CapacityInGB = $diskCapacity
-					SpaceUsedInGB = $diskSpaceUsed
-					SpaceFreeInGB = $diskSpaceFree
-					PercentFree = $diskPercentFree
-					DatastoreList = $dsName
-				} # end $objGuest
+				Write-Verbose -Message "Gathering VM Host details for $($vm.Name)"
 
-				$colFinalResults += $objGuestDisk
-			} # end foreach $disk
+				$vmHostDetail = Get-VMHost -Id ($vmDetail.Summary.Runtime.Host)
 
-		} # end foreach $vm
+
+				Write-Verbose -Message "Gathering partition details on $($vm.Name)"
+
+				$diskInfo = $vmDetail.Guest.Disk
+
+				foreach ($disk in $diskInfo) {
+					if ($disk.Capacity -eq 0) {
+						Write-Warning -Message "Disk capacity is zero; zeroing all values for the $($disk.Diskpath) partition on $($vm.name)"
+						$diskCapacity = 0
+						$diskSpaceUsed = 0
+						$diskSpaceFree = 0
+						$diskPercentFree = 0
+					} else {
+						$diskCapacity = $disk.Capacity / 1GB
+						$diskSpaceUsed = ($disk.Capacity - $disk.FreeSpace) / 1GB
+						$diskSpaceFree = $disk.FreeSpace / 1GB
+						$diskPercentFree = ($disk.FreeSpace / $disk.Capacity) * 100
+					} # end if/else
+
+					$objGuestDisk = [PSCustomObject] @{
+						Name = $vm.Name
+						Cluster = $vmHostDetail.Parent
+						VMHost = $vmHostDetail.Name
+						Partition = $disk.DiskPath
+						CapacityInGB = $diskCapacity
+						SpaceUsedInGB = $diskSpaceUsed
+						SpaceFreeInGB = $diskSpaceFree
+						PercentFree = $diskPercentFree
+						DatastoreList = $dsName
+						VMXPath = $vmVMXPath
+						DatastoreMapping = $dsMap
+					} # end $objGuest
+
+					$colFinalResults += $objGuestDisk
+				} # end foreach $disk
+
+			} # end foreach $vm
+		} # end if/else
 	} catch {
-		Write-Warning -Message "Error Gathering Details - $_"
+		Write-Warning -Message "Error Gathering Details on $vm - $_"
+		Write-Output "$(TimeStamp) Error: Gathering Details on $vm - $_" >> $log
 	} # end try/catch
 
 }# end PROCESS
@@ -232,5 +333,9 @@ PROCESS {
 END {
 	Write-Verbose -Message 'Done'
 	$colFinalResults
+	$dtScriptEnd = Get-Date
+	$dtRuntime = $dtScriptEnd - $dtScriptStart
+	Write-Output "======== Total Runtime: $($dtRunTime.Hours) Hours, $($dtRuntime.Minutes) Minutes, $($dtRuntime.Seconds) Seconds  ========" >> $log
+	Write-Output "======== Get-VMDiskSpace - Completed - $(TimeStamp) ========" >> $log
 
 }# end END
