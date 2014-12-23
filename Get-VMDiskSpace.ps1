@@ -11,18 +11,22 @@
 	Pipeline input is supported, so you can use it similar to 'Get-DataCenter DC01 | Get-VM | .\Get-VMDiskSpace'.
 
 	The native input format that is required is that of a VI virtual machine (see .INPUTS). Any string values provided will be checked and then attemtpe to be converted to the proper type.
+
+	Also included in the output is a 'DatastoreList' property. Since there is no easy/reliable way to correlate: guest partition --> .VMDK --> datastore, the 'DatastoreList' represents all datastores that the guest has
+	a current .VMDK on. In theory, if your datastores had some type of standard naming convension, one might be able to make an educated guess where a partition's .VMDK resides. Either way, you can at least narrow your
+	search in a larger environment. 
 	
 	Sample format from '| Format-Table -AutoSize' (See Example 1 for execution details)
 
-Name     Partition CapacityInGB SpaceUsedInGB SpaceFreeInGB PercentFree
-----     --------- ------------ ------------- ------------- -----------
-WINSRV01 C:\                 50            12            38          76
-WINSRV01 D:\                500           419            81          16
-WINSRV02 C:\                 60            25            34          58
-REDHAT01 /                    8             4             4          49
-REDHAT01 /boot                0             0             0          65
-REDHAT01 /sda4               49             5            45          91
-REDHAT01 /sdb                59             6            53          89
+Name     Partition CapacityInGB SpaceUsedInGB SpaceFreeInGB PercentFree DatastoreList
+----     --------- ------------ ------------- ------------- ----------- -------------
+WINSRV01 C:\                 50            12            38          76 nas02_sas_nonrepl_swap, nas01_sata_nonrepl_nfs1
+WINSRV01 D:\                500           419            81          16 nas02_sas_nonrepl_swap, nas01_sata_nonrepl_nfs1
+WINSRV02 C:\                 60            25            34          58 nas01_sata_nonrepl_nfs1
+REDHAT01 /                    8             4             4          49 nas02_sas_nonrepl_swap, nas01_sata_nonrepl_nfs1, nas01_sata_nonrepl_nfs2
+REDHAT01 /boot                0             0             0          65 nas02_sas_nonrepl_swap, nas01_sata_nonrepl_nfs1, nas01_sata_nonrepl_nfs2
+REDHAT01 /sda4               49             5            45          91 nas02_sas_nonrepl_swap, nas01_sata_nonrepl_nfs1, nas01_sata_nonrepl_nfs2
+REDHAT01 /sdb                59             6            53          89 nas02_sas_nonrepl_swap, nas01_sata_nonrepl_nfs1, nas01_sata_nonrepl_nfs2
 
 .PARAMETER Name
 	Display name of VMware Guest/s
@@ -43,7 +47,8 @@ REDHAT01 /sdb                59             6            53          89
 	.\Get-VMDiskSpace -Name (Get-VM VM01,VM02,VM03) | Out-GridView
 .NOTES
 	Author: Kevin Kirkpatrick
-	Last Update: 20141222
+	Last Update: 20141223
+	Last Update Notes: -Added 'DatastoreList' property to output
 
 	#TAG:PUBLIC
 	
@@ -136,11 +141,13 @@ PROCESS {
 	[int]$diskSpaceUsed = $null
 	[int]$diskSpaceFree = $null
 	[int]$diskPercentFree = $null
+	$vmCurrentDatastores = $null
 	
 	<#
 	- Validate VM type; if strings were passed, convert the type from [System.String] to [VMware.VimAutomation.ViCore.Impl.V1.Inventory.VirtualMachineImpl] by using Get-VM
 	- use foreach to interate through the array of guest names passed
 	- ignore guests that are powered off
+	- collect data on current datastores that each partition could potentially reside on
 	- store detail in a custom object and add each iteration to the $colFinalResults array
 	#>
 	
@@ -155,13 +162,13 @@ PROCESS {
 			Exit
 		} # end try/catch
 	} else {
-		Write-Verbose -Message 'VM Type is correct; continuing...'
+		Write-Verbose -Message 'VM Type is correct or has been converted correctly; continuing...'
 	} # end if/else
 	
 	try {
 		foreach ($vm in $Name) {
 			
-			Write-Verbose -Message "Gathering VM Details on $($vm.Name)"
+			Write-Verbose -Message "Gathering VM details on $($vm.Name)"
 			
 			if ($vm.PowerState -eq 'PoweredOff') {
 				
@@ -170,6 +177,22 @@ PROCESS {
 			} else {
 				$vmDetail = $vm.ExtensionData
 			} # end if/else
+			
+			
+			Write-Verbose -Message "Gathering current datastores on $($vm.Name)"
+			
+			$vmCurrentDatastores = $vmDetail.Config.DatastoreUrl.Name
+			
+			foreach ($datastore in $vmCurrentDatastores) {
+				$dsName += "$datastore, "
+			} # end foreach
+			
+			<# In regex, '$' indicates the last charater in a string or before '\n' at the end of a line or string; '.' is wildcard for any single charater except for '\n';
+			"..$" = remove the last two charaters of the string, which would be a comma and one space, in this scenario. #>
+			$dsName = $dsName -replace "..$"
+			
+			
+			Write-Verbose -Message "Gathering partition details on $($vm.Name)"
 			
 			$diskInfo = $vmDetail.Guest.Disk
 			
@@ -194,11 +217,13 @@ PROCESS {
 					SpaceUsedInGB = $diskSpaceUsed
 					SpaceFreeInGB = $diskSpaceFree
 					PercentFree = $diskPercentFree
+					DatastoreList = $dsName
 				} # end $objGuest
 				
 				$colFinalResults += $objGuestDisk
-			} # end forech
-		} # end foreach
+			} # end foreach $disk
+			
+		} # end foreach $vm
 	} catch {
 		Write-Warning -Message "Error Gathering Details - $_"
 	} # end try/catch
