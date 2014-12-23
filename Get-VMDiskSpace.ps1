@@ -132,17 +132,6 @@ BEGIN {
 }# BEGIN
 
 PROCESS {
-	
-	# call/set variables and varialbe types
-	$objGuestDisk = @()
-	$vmDetail = $null
-	$diskInfo = $null
-	[int]$diskCapacity = $null
-	[int]$diskSpaceUsed = $null
-	[int]$diskSpaceFree = $null
-	[int]$diskPercentFree = $null
-	$vmCurrentDatastores = $null
-	
 	<#
 	- Validate VM type; if strings were passed, convert the type from [System.String] to [VMware.VimAutomation.ViCore.Impl.V1.Inventory.VirtualMachineImpl] by using Get-VM
 	- use foreach to interate through the array of guest names passed
@@ -167,6 +156,16 @@ PROCESS {
 	
 	try {
 		foreach ($vm in $Name) {
+			# call/set variables and varialbe types
+			$objGuestDisk = @()
+			$vmDetail = $null
+			$diskInfo = $null
+			[int]$diskCapacity = $null
+			[int]$diskSpaceUsed = $null
+			[int]$diskSpaceFree = $null
+			[int]$diskPercentFree = $null
+			$vmCurrentDatastores = $null
+			$dsName = $null
 			
 			Write-Verbose -Message "Gathering VM details on $($vm.Name)"
 			
