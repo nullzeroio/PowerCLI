@@ -3,8 +3,8 @@
 	Gather guest OS partition details from a VMware vSphere environment
 .DESCRIPTION
 	This script/function will return individual partition space details for VMware guests operating systems.
-	
-	The script/function is geared towards the virtualization administrator that may not have the necessary guest OS credentials or privileges to query partion level disk space details across a heterogeneous guest environment. 
+
+	The script/function is geared towards the virtualization administrator that may not have the necessary guest OS credentials or privileges to query partion level disk space details across a heterogeneous guest environment.
 
 	This script/function pulls the information that is provided by VMware Tools, within the each guest OS. As such, VMware Tools must be installed to query this level of detail via the vSphere API.
 
@@ -14,8 +14,8 @@
 
 	Also included in the output is a 'DatastoreList' property. Since there is no easy/reliable way to correlate: guest partition --> .VMDK --> datastore, the 'DatastoreList' represents all datastores that the guest has
 	a current .VMDK on. In theory, if your datastores had some type of standard naming convension, one might be able to make an educated guess where a partition's .VMDK resides. Either way, you can at least narrow your
-	search in a larger environment. 
-	
+	search in a larger environment.
+
 	Sample format from '| Format-Table -AutoSize' (See Example 1 for execution details)
 
 Name     Partition CapacityInGB SpaceUsedInGB SpaceFreeInGB PercentFree DatastoreList
@@ -51,7 +51,7 @@ REDHAT01 /sdb                59             6            53          89 nas02_sa
 	Last Update Notes: -Added 'DatastoreList' property to output
 
 	#TAG:PUBLIC
-	
+
 	GitHub:	 https://github.com/vN3rd
 	Twitter:  @vN3rd
 	Email:	 kevin@pinelabs.co
@@ -80,7 +80,7 @@ param (
 			   ValueFromPipelineByPropertyName = $true)]
 	[alias('VM', 'Guest')]
 	$Name,
-	
+
 	[parameter(Mandatory = $false,
 			   Position = 1)]
 	[string]$VIServer
@@ -92,11 +92,11 @@ BEGIN {
 	- Check if the VMware.VimAutomation.Core PSSnapin had been added; if not, attempt to add it
 	- Connect to the provided vCenter Server, if none if provided, check to see if a connection has already been established
 	#>
-	
+
 	$colFinalResults = @()
-	
+
 	Write-Verbose -Message 'Checking for VMware.VimAutomation.Core PSSnapin'
-	
+
 	if ((Get-PSSnapin -Name VMware.VimAutomation.Core -ErrorAction 'SilentlyContinue').Name -eq $null) {
 		try {
 			Add-PSSnapin VMware.VimAutomation.Core -ErrorAction 'Stop'
@@ -106,13 +106,13 @@ BEGIN {
 			Exit
 		} # try/catch
 	} else {
-		
+
 		Write-Verbose -Message "VMware.VimAutomation.Core PSSnapin is already added; continuing..."
 	} # end if/else
-	
-	
+
+
 	Write-Verbose -Message 'Connecting to vCenter Server'
-	
+
 	if ($VIServer) {
 		try {
 			$VIServer = Connect-VIServer -Server $VIServer
@@ -128,7 +128,7 @@ BEGIN {
 	} else {
 		$VIServer = $global:defaultviserver
 	} # end if/else
-	
+
 }# BEGIN
 
 PROCESS {
@@ -139,9 +139,9 @@ PROCESS {
 	- collect data on current datastores that each partition could potentially reside on
 	- store detail in a custom object and add each iteration to the $colFinalResults array
 	#>
-	
+
 	Write-Verbose -Message 'Validating VM Type'
-	
+
 	if (($Name).GetType().Fullname -ne 'VMware.VimAutomation.ViCore.Impl.V1.Inventory.VirtualMachineImpl') {
 		try {
 			$Name = Get-VM -Name $Name
@@ -153,7 +153,7 @@ PROCESS {
 	} else {
 		Write-Verbose -Message 'VM Type is correct or has been converted correctly; continuing...'
 	} # end if/else
-	
+
 	try {
 		foreach ($vm in $Name) {
 			# call/set variables and varialbe types
@@ -166,35 +166,35 @@ PROCESS {
 			[int]$diskPercentFree = $null
 			$vmCurrentDatastores = $null
 			$dsName = $null
-			
+
 			Write-Verbose -Message "Gathering VM details on $($vm.Name)"
-			
+
 			if ($vm.PowerState -eq 'PoweredOff') {
-				
+
 				Write-Warning -Message "$($vm.Name) is PoweredOff"
-				
+
 			} else {
 				$vmDetail = $vm.ExtensionData
 			} # end if/else
-			
-			
+
+
 			Write-Verbose -Message "Gathering current datastores on $($vm.Name)"
-			
+
 			$vmCurrentDatastores = $vmDetail.Config.DatastoreUrl.Name
-			
+
 			foreach ($datastore in $vmCurrentDatastores) {
 				$dsName += "$datastore, "
 			} # end foreach
-			
+
 			<# In regex, '$' indicates the last charater in a string or before '\n' at the end of a line or string; '.' is wildcard for any single charater except for '\n';
 			"..$" = remove the last two charaters of the string, which would be a comma and one space, in this scenario. #>
 			$dsName = $dsName -replace "..$"
-			
-			
+
+
 			Write-Verbose -Message "Gathering partition details on $($vm.Name)"
-			
+
 			$diskInfo = $vmDetail.Guest.Disk
-			
+
 			foreach ($disk in $diskInfo) {
 				if ($disk.Capacity -eq 0) {
 					Write-Warning -Message "Disk capacity is zero; zeroing all values for the $($disk.Diskpath) partition on $($vm.name)"
@@ -208,7 +208,7 @@ PROCESS {
 					$diskSpaceFree = $disk.FreeSpace / 1GB
 					$diskPercentFree = ($disk.FreeSpace / $disk.Capacity) * 100
 				} # end if/else
-				
+
 				$objGuestDisk = [PSCustomObject] @{
 					Name = $vm.Name
 					Partition = $disk.DiskPath
@@ -218,19 +218,19 @@ PROCESS {
 					PercentFree = $diskPercentFree
 					DatastoreList = $dsName
 				} # end $objGuest
-				
+
 				$colFinalResults += $objGuestDisk
 			} # end foreach $disk
-			
+
 		} # end foreach $vm
 	} catch {
 		Write-Warning -Message "Error Gathering Details - $_"
 	} # end try/catch
-	
+
 }# end PROCESS
 
 END {
 	Write-Verbose -Message 'Done'
 	$colFinalResults
-	
+
 }# end END
