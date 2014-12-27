@@ -85,9 +85,6 @@ PROCESS {
 		$esxcli = $null
 		$softwareList = $null
 		
-		# Ignore verbose output until Get-EsxCli and Get-View cmdlets are finished running
-		$VerbosePreference = [System.Management.Automation.ActionPreference]::SilentlyContinue
-		
 		# Assign vmhost query objects to a variable to be called later
 		$esxcli = Get-EsxCli -VMHost $VMHost
 		$softwareList = $esxcli.software.vib.list() | Where-Object { $_.Name -like "$VIBName" }
@@ -95,8 +92,6 @@ PROCESS {
 		# get uptime details
 		$bootTime = ($VMHost | Get-View).runtime.boottime
 		$calcUptime = ((Get-Date) - $bootTime)
-		
-		$VerbosePreference = [System.Management.Automation.ActionPreference]::Continue
 		
 		# Create custom object to store host/vib information
 		$objHpVib = [PSCustomObject] @{
@@ -113,6 +108,7 @@ PROCESS {
 			HostVersionBuild = $_.Build
 			HostMfg = $_.Manufacturer
 			HostModel = $_.Model
+			Status = $null
 		} # $objHpVib
 		
 		# Send collection detail for current object to the final $result variable
@@ -124,10 +120,22 @@ PROCESS {
 		$colError = @()
 		
 		# create new object to store error detail
-		$objError = New-Object -TypeName psobject -Property @{
+		$objError = [PSCustomObject] @{
 			Host = $_.Name
+			VibName = $null
+			VibVersion = $null
+			VibVendor = $null
+			VibInstallDate = $null
+			VibID = $null
+			VibCreationDate = $null
+			VibStatus = $null
+			HostUptimeDays = $null
+			HostVersion = $null
+			HostVersionBuild = $null
+			HostMfg = $null
+			HostModel = $null
 			Status = "$_"
-		}# $objError
+		} # $objError
 		
 		# send collection detail to final $result variable
 		$result += $objError
