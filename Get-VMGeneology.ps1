@@ -58,7 +58,7 @@ param (
 			   ParameterSetName = "Name",
 			   Position = 0)]
 	[alias("VM")]
-	[string]$Name,
+	$Name,
 	
 	[parameter(Mandatory = $false, Position = 1, ValueFromPipeline = $true)]
 	[alias("VC")]
@@ -66,55 +66,68 @@ param (
 	
 )
 
-BEGIN
-{
-	# define variables
-	$getvm = $null
-	$vmconfig = $null
-	$vihost = $null
-	$HostDetail = $null
-	$ClusterDetail = $null
-	$currentvpg = $null
-	$CurrentVswitch = $null
+BEGIN {
+	# define variables/functions
 	
-}# end BEGIN
-
-PROCESS
-{
-	try
-	{
-		
-		Write-Verbose -Message "Querying for guest geneology"
-		
-		$GetVM = Get-VM -Name $Name	# get vm and store result into variable
-		$VMConfig = ($GetVM | Get-View).config	# use Get-View to call the config attribute in order to access child values
-		$VIHost = $GetVM | Get-VMHost	# Get VMHost where guest is currently running
-		$ClusterDetail = $VIHost | Get-Cluster | Get-View	# Use Get-ViewType to store cluster detail of current host
-		$CurrentVPG = $GetVM | Get-VirtualPortGroup		# Grab current virtual port group the guest is using
-		$CurrentVswitch = $GetVM | Get-VirtualSwitch	# Grab current vSwitch the VM is running on
-		
-		$objVMGenes = New-Object -TypeName PSObject -Property @{
-			VM = $VMConfig.Name
-			CurrentHost = $GetVM.VMHost
-			CurrentCluster = $ClusterDetail.Name
-			NumHostsInCluster = $ClusterDetail.host.count
-			CurrentDatastore = $VMConfig.datastoreurl.name
-			PortGroup = $CurrentVPG.Name
-			PortGroupVLAN = $CurrentVPG.VLanId
-			vSwitch = $CurrentVswitch.Name
-		}# end objVMGenes
-		
-	} catch
-	{
-		Write-Warning -Message "$_"
-	}# end try/catch
+	#Requires -Version 3
 	
-}# end PROCESS
+	$colFinalResults = @()
+	$ErrorActionPreference = [System.Management.Automation.ActionPreference]::Stop
+	
+} # end BEGIN
 
-END
-{
-	# Call final results and customize output order
+PROCESS {
+	foreach ($vm in $Name) {
+		try {
+		<#
+		- get vm and store result into variable
+		- use Get-View to call the config attribute in order to access child values
+		- Get VMHost where guest is currently running
+		- Use Get-ViewType to store cluster detail of current host
+		- Grab current virtual port group the guest is using
+		- Grab current vSwitch the VM is running on
+		#>
+			
+			$getvm = $null
+			$vmconfig = $null
+			$vihost = $null
+			$HostDetail = $null
+			$ClusterDetail = $null
+			$currentvpg = $null
+			$CurrentVswitch = $null
+			$objVMGenes = @()
+			
+			Write-Verbose -Message "Querying for guest geneology"
+			
+			$GetVM = Get-VM -Name $vm
+			$VMConfig = ($GetVM | Get-View).config
+			$VIHost = $GetVM | Get-VMHost
+			$ClusterDetail = $VIHost | Get-Cluster | Get-View
+			$CurrentVPG = $GetVM | Get-VirtualPortGroup
+			$CurrentVswitch = $GetVM | Get-VirtualSwitch
+			
+			$objVMGenes = [PSCustomObject] @{
+				VM = $VMConfig.Name
+				CurrentHost = $GetVM.VMHost
+				CurrentCluster = $ClusterDetail.Name
+				NumHostsInCluster = $ClusterDetail.host.count
+				CurrentDatastore = $VMConfig.datastoreurl.name
+				PortGroup = $CurrentVPG.Name
+				PortGroupVLAN = $CurrentVPG.VLanId
+				vSwitch = $CurrentVswitch.Name
+			} # end objVMGenes
+			
+			$colFinalResults += $objVMGenes
+			
+		} catch {
+			Write-Warning -Message "$_"
+		} # end try/catch
+	} # end foreach $vm in $name
+	
+} # end PROCESS
+
+END {
 	Write-Verbose -Message "Calling final results"
 	
-	$objVMGenes | Select-Object VM, CurrentHost, CurrentCluster, NumHostsInCluster, CurrentDatastore, PortGroup, PortGroupVLAN, vSwitch
-}# end END
+	$colFinalResults
+} # end END
