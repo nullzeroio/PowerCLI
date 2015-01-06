@@ -104,7 +104,7 @@ param (
 			   ValueFromPipelineByPropertyName = $true)]
 	[alias('VM', 'Guest')]
 	$Name,
-
+	
 	[parameter(Mandatory = $false,
 			   Position = 1)]
 	[string]$VIServer
@@ -118,33 +118,29 @@ BEGIN {
 	- Check if the VMware.VimAutomation.Core PSSnapin had been added; if not, attempt to add it
 	- Connect to the provided vCenter Server, if none if provided, check to see if a connection has already been established
 	#>
-
+	
 	$ErrorActionPreference = [System.Management.Automation.ActionPreference]::Stop
-
-	function Get-ScriptDirectory
-	{
-		if($hostinvocation -ne $null)
-		{
+	
+	function Get-ScriptDirectory {
+		if ($hostinvocation -ne $null) {
 			Split-Path $hostinvocation.MyCommand.path
-		}
-		else
-		{
+		} else {
 			Split-Path $script:MyInvocation.MyCommand.Path
 		}
 	} # end function Get-ScriptDirectory
-
+	
 	function TimeStamp {
 		$dtLogTimeStamp = Get-Date -Format ("[yyyy-MM-dd HH:mm:ss] ")
 		$dtLogTimeStamp
 	} # end function TimeStamp
-
+	
 	$dtScriptStart = Get-Date
 	$dtLogFileName = (Get-Date).ToString("yyyyMMddHHmmss")
-
+	
 	$scriptPath = Get-ScriptDirectory
 	$logDirectory = "$scriptPath\Get-VMDiskSpaceLogs"
 	$log = "$logDirectory\Get-VMDiskSpace_$dtLogFileName.log"
-
+	
 	if (-not (Test-Path -Path $logDirectory)) {
 		try {
 			New-Item -ItemType Directory -Path $scriptPath -Name 'Get-VMDiskSpaceLogs' | Out-Null
@@ -154,13 +150,13 @@ BEGIN {
 			Exit
 		} # end try/catch
 	} # end if/else Test-Path
-
+	
 	Write-Output "======== Get-VMDiskSpace - Started - $(TimeStamp) ========" >> $log
-
+	
 	$colFinalResults = @()
-
+	
 	Write-Verbose -Message 'Checking for VMware.VimAutomation.Core PSSnapin'
-
+	
 	if ((Get-PSSnapin -Name VMware.VimAutomation.Core -ErrorAction 'SilentlyContinue').Name -eq $null) {
 		try {
 			Add-PSSnapin VMware.VimAutomation.Core -ErrorAction 'Stop'
@@ -172,13 +168,13 @@ BEGIN {
 			Exit
 		} # try/catch
 	} else {
-
+		
 		Write-Verbose -Message "VMware.VimAutomation.Core PSSnapin is already added; continuing..."
 	} # end if/else
-
-
+	
+	
 	Write-Verbose -Message 'Connecting to vCenter Server'
-
+	
 	if ($VIServer) {
 		try {
 			$VIServer = Connect-VIServer -Server $VIServer
@@ -198,7 +194,7 @@ BEGIN {
 	} else {
 		$VIServer = $global:defaultviserver
 	} # end if/else
-
+	
 }# BEGIN
 
 PROCESS {
@@ -209,9 +205,9 @@ PROCESS {
 	- collect data on current datastores that each partition could potentially reside on
 	- store detail in a custom object and add each iteration to the $colFinalResults array
 	#>
-
+	
 	Write-Verbose -Message 'Validating VM Type'
-
+	
 	if (($Name).GetType().Fullname -ne 'VMware.VimAutomation.ViCore.Impl.V1.Inventory.VirtualMachineImpl') {
 		try {
 			$Name = Get-VM -Name $Name
@@ -225,7 +221,7 @@ PROCESS {
 	} else {
 		Write-Verbose -Message 'VM Type is correct or has been converted correctly; continuing...'
 	} # end if/else
-
+	
 	try {
 		foreach ($vm in $Name) {
 			# call/set variables and varialbe types
@@ -241,55 +237,55 @@ PROCESS {
 			$dsMap = $null
 			$vmVMXPath = $null
 			$vmHostDetail = $null
-
+			
 			Write-Verbose -Message "Gathering VM details on $($vm.Name)"
 			Write-Output "$(TimeStamp) Info: Gatering VM details on $($vm.Name)" >> $log
-
+			
 			if ($vm.PowerState -eq 'PoweredOff') {
-
+				
 				Write-Warning -Message "$($vm.Name) is Powered Off"
 				Write-Output "$(TimeStamp) Warning: $($vm.Name) is Powered Off " >> $log
-
+				
 			} else {
 				$vmDetail = $vm.ExtensionData
-
+				
 				Write-Verbose -Message "Gathering current datastores on $($vm.Name)"
-
+				
 				$vmCurrentDatastores = $vmDetail.Config.DatastoreUrl.Name
-
+				
 				foreach ($datastore in $vmCurrentDatastores) {
 					$dsName += "$datastore, "
 				} # end foreach $datastore
-
+				
 			<# In regex, '$' indicates the last charater in a string or before '\n' at the end of a line or string; '.' is wildcard for any single charater except for '\n';
 			"..$" = remove the last two charaters of the string, which would be a comma and one space, in this scenario. #>
 				$dsName = $dsName -replace "..$"
-
+				
 				Write-Verbose -Message "Gathering .VMDK <--> Datastore mappings for $($vm.Name)"
-
+				
 				$vmDatastoreMap = ($vmDetail.layoutex.file | Where-Object { $_.name -like '*.vmdk' -and $_.name -notlike '*flat*' }).Name
-
+				
 				foreach ($mapping in $vmDatastoreMap) {
 					$dsMap += "$mapping, "
 				} # end foreach $mapping
-
+				
 				$dsMap = $dsMap -replace "..$"
-
-
+				
+				
 				Write-Verbose -Message "Gathering .VMX path for $($vm.Name)"
-
+				
 				$vmVMXPath = $vmDetail.summary.config.vmpathname
-
-
+				
+				
 				Write-Verbose -Message "Gathering VM Host details for $($vm.Name)"
-
+				
 				$vmHostDetail = Get-VMHost -Id ($vmDetail.Summary.Runtime.Host)
-
-
+				
+				
 				Write-Verbose -Message "Gathering partition details on $($vm.Name)"
-
+				
 				$diskInfo = $vmDetail.Guest.Disk
-
+				
 				foreach ($disk in $diskInfo) {
 					if ($disk.Capacity -eq 0) {
 						Write-Warning -Message "Disk capacity is zero; zeroing all values for the $($disk.Diskpath) partition on $($vm.name)"
@@ -303,7 +299,7 @@ PROCESS {
 						$diskSpaceFree = $disk.FreeSpace / 1GB
 						$diskPercentFree = ($disk.FreeSpace / $disk.Capacity) * 100
 					} # end if/else
-
+					
 					$objGuestDisk = [PSCustomObject] @{
 						Name = $vm.Name
 						Cluster = $vmHostDetail.Parent
@@ -317,17 +313,17 @@ PROCESS {
 						VMXPath = $vmVMXPath
 						DatastoreMapping = $dsMap
 					} # end $objGuest
-
+					
 					$colFinalResults += $objGuestDisk
 				} # end foreach $disk
-
+				
 			} # end foreach $vm
 		} # end if/else
 	} catch {
 		Write-Warning -Message "Error Gathering Details on $vm - $_"
 		Write-Output "$(TimeStamp) Error: Gathering Details on $vm - $_" >> $log
 	} # end try/catch
-
+	
 }# end PROCESS
 
 END {
@@ -337,5 +333,5 @@ END {
 	$dtRuntime = $dtScriptEnd - $dtScriptStart
 	Write-Output "======== Total Runtime: $($dtRunTime.Hours) Hours, $($dtRuntime.Minutes) Minutes, $($dtRuntime.Seconds) Seconds  ========" >> $log
 	Write-Output "======== Get-VMDiskSpace - Completed - $(TimeStamp) ========" >> $log
-
+	
 }# end END
