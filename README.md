@@ -1,4 +1,4 @@
 PowerCLI
 ========
 
-PowerCLI Scripts
+Public PowerCLI script repository.
