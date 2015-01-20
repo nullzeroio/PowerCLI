@@ -119,8 +119,6 @@ BEGIN {
 	- Connect to the provided vCenter Server, if none if provided, check to see if a connection has already been established
 	#>
 	
-	$ErrorActionPreference = [System.Management.Automation.ActionPreference]::Stop
-	
 	function Get-ScriptDirectory {
 		if ($hostinvocation -ne $null) {
 			Split-Path $hostinvocation.MyCommand.path
@@ -210,7 +208,7 @@ PROCESS {
 	
 	if (($Name).GetType().Fullname -ne 'VMware.VimAutomation.ViCore.Impl.V1.Inventory.VirtualMachineImpl') {
 		try {
-			$Name = Get-VM -Name $Name
+			$Name = Get-VM -Name $Name -ErrorAction 'Stop'
 		} catch {
 			Write-Warning -Message "Error converting $Name to a proper VI object type"
 			Write-Warning -Message 'Exiting script'
@@ -279,7 +277,15 @@ PROCESS {
 				
 				Write-Verbose -Message "Gathering VM Host details for $($vm.Name)"
 				
-				$vmHostDetail = Get-VMHost -Id ($vmDetail.Summary.Runtime.Host)
+				try {
+					$vmHostDetail = Get-VMHost -Id ($vmDetail.Summary.Runtime.Host) -ErrorAction 'Stop'
+				} catch {
+					Write-Warning -Message "Error gathering host details"
+					Write-Warning -Message 'Exiting script'
+					Write-Output "$(TimeStamp) Error: gathering host details - $_" >> $log
+					Write-Output "$(TimeStamp) Error: Exiting script" >> $log
+					Exit
+				} # end try/catch
 				
 				
 				Write-Verbose -Message "Gathering partition details on $($vm.Name)"
