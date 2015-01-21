@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
 	Basic script that will list what type of network adapter each powered on guest has been assigned
 .DESCRIPTION

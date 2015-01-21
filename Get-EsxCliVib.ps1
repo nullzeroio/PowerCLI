@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
 	Get details on a specific ESXi VIB
 .DESCRIPTION
@@ -35,9 +35,9 @@ HostModel        : ProLiant BL460c Gen8
 
 	#TAG:PUBLIC
 	
-	GitHub:	 https://github.com/vN3rd
-	Twitter:  @vN3rd
-	Email:	 kevin@pinelabs.co
+	GitHub:	 https://github.com/vScripter
+	Twitter:  @vScripter
+	Email:	 kevin@vMotioned.com
 
 [-------------------------------------DISCLAIMER-------------------------------------]
  All script are provided as-is with no implicit
@@ -50,7 +50,7 @@ HostModel        : ProLiant BL460c Gen8
 [-------------------------------------DISCLAIMER-------------------------------------]
 
 .LINK
-	https://github.com/vN3rd
+	https://github.com/vScripter
 #>
 
 [CmdletBinding(DefaultParameterSetName = 'Default',

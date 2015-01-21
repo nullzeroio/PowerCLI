@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
 	Gathers current 'geneology' of a VM.
 .DESCRIPTION
@@ -30,9 +30,9 @@ vSwitch           : vSwitch1
 	TODO:	[+] Add full support for supplying multiple VMs
 
 
-	GitHub:	 https://github.com/vN3rd
-	Twitter:  @vN3rd
-	Email:	 kevin@pinelabs.co
+	GitHub:	 https://github.com/vScripter
+	Twitter:  @vScripter
+	Email:	 kevin@vMotioned.com
 
 [-------------------------------------DISCLAIMER-------------------------------------]
  All script are provided as-is with no implicit
@@ -44,7 +44,7 @@ vSwitch           : vSwitch1
  my GitHub page. Thanks for your support!
 [-------------------------------------DISCLAIMER-------------------------------------]
 .LINK
-	https://github.com/vN3rd
+	https://github.com/vScripter
 
 
 #>
