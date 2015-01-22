@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
 	Gather guest OS partition details from a VMware vSphere environment
 .DESCRIPTION
@@ -76,9 +76,9 @@ DatastoreMapping : [nas01_sata_nonrepl_nfs2] WINSERVER01/WINSERVER01.vmdk, [nas0
 
 	#TAG:PUBLIC
 
-	GitHub:	 https://github.com/vN3rd
-	Twitter:  @vN3rd
-	Email:	 kevin@pinelabs.co
+	GitHub:	 https://github.com/vScripter
+	Twitter:  @vScripter
+	Email:	 kevin@vMotioned.com
 
 [-------------------------------------DISCLAIMER-------------------------------------]
  All script are provided as-is with no implicit
@@ -91,7 +91,7 @@ DatastoreMapping : [nas01_sata_nonrepl_nfs2] WINSERVER01/WINSERVER01.vmdk, [nas0
 [-------------------------------------DISCLAIMER-------------------------------------]
 
 .LINK
-	https://github.com/vN3rd
+	https://github.com/vScripter
 #>
 
 #Requires -Version 3

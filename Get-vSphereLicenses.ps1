@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Basic script to show current licensing status
 .DESCRIPTION
@@ -18,7 +18,7 @@
  my GitHub page. Thanks for your support!
 [-------------------------------------DISCLAIMER-------------------------------------]
     .LINK
-        https://github.com/vN3rd/PowerShell-Scripts
+        https://github.com/vScripter/PowerShell-Scripts
 
 #>
 
