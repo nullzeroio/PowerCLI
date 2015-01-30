@@ -196,7 +196,29 @@ BEGIN {
 }# BEGIN
 
 PROCESS {
+	<#
+	- Validate VM type; if strings were passed, convert the type from [System.String] to [VMware.VimAutomation.ViCore.Impl.V1.Inventory.VirtualMachineImpl] by using Get-VM
+	- use foreach to interate through the array of guest names passed
+	- ignore guests that are powered off
+	- collect data on current datastores that each partition could potentially reside on
+	- store detail in a custom object and add each iteration to the $colFinalResults array
+	#>
 	
+	Write-Verbose -Message 'Validating VM Type'
+	
+	if (($Name).GetType().Fullname -ne 'VMware.VimAutomation.ViCore.Impl.V1.Inventory.VirtualMachineImpl') {
+		try {
+			$Name = Get-VM -Name $Name -ErrorAction 'Stop'
+		} catch {
+			Write-Warning -Message "Error converting $Name to a proper VI object type"
+			Write-Warning -Message 'Exiting script'
+			Write-Output "$(TimeStamp) Error: converting $Name to a proper VI object type" >> $log
+			Write-Output "$(TimeStamp) Error: Exiting script" >> $log
+			Exit
+		} # end try/catch
+	} else {
+		Write-Verbose -Message 'VM Type is correct or has been converted correctly; continuing...'
+	} # end if/else
 	
 	try {
 		foreach ($vm in $Name) {
@@ -213,27 +235,6 @@ PROCESS {
 			$dsMap = $null
 			$vmVMXPath = $null
 			$vmHostDetail = $null
-			
-			<#
-			- Validate VM type; if strings were passed, convert the type from [System.String] to [VMware.VimAutomation.ViCore.Impl.V1.Inventory.VirtualMachineImpl] by using Get-VM
-			- use foreach to interate through the array of guest names passed
-			- ignore guests that are powered off
-			- collect data on current datastores that each partition could potentially reside on
-			- store detail in a custom object and add each iteration to the $colFinalResults array
-			#>
-			
-			Write-Verbose -Message 'Validating VM Type'
-			
-			if (($vm).GetType().Fullname -ne 'VMware.VimAutomation.ViCore.Impl.V1.Inventory.VirtualMachineImpl') {
-				try {
-					$vm = Get-VM -Name $vm -ErrorAction 'Stop'
-				} catch {
-					Write-Warning -Message "Error converting $vm to a proper VI object type"
-					Write-Output "$(TimeStamp) Error: converting input to a proper VI object type" >> $log
-				} # end try/catch
-			} else {
-				Write-Verbose -Message 'VM Type is correct or has been converted correctly; continuing...'
-			} # end if/else
 			
 			Write-Verbose -Message "Gathering VM details on $($vm.Name)"
 			Write-Output "$(TimeStamp) Info: Gatering VM details on $($vm.Name)" >> $log
@@ -280,8 +281,10 @@ PROCESS {
 					$vmHostDetail = Get-VMHost -Id ($vmDetail.Summary.Runtime.Host) -ErrorAction 'Stop'
 				} catch {
 					Write-Warning -Message "Error gathering host details"
+					Write-Warning -Message 'Exiting script'
 					Write-Output "$(TimeStamp) Error: gathering host details - $_" >> $log
-	
+					Write-Output "$(TimeStamp) Error: Exiting script" >> $log
+					Exit
 				} # end try/catch
 				
 				
