@@ -45,8 +45,6 @@ vSwitch           : vSwitch1
 [-------------------------------------DISCLAIMER-------------------------------------]
 .LINK
 	https://github.com/vScripter
-
-
 #>
 
 [cmdletbinding(PositionalBinding = $true)]
@@ -59,21 +57,21 @@ param (
 			   Position = 0)]
 	[alias("VM")]
 	$Name,
-	
+
 	[parameter(Mandatory = $false, Position = 1, ValueFromPipeline = $true)]
 	[alias("VC")]
 	[string]$vCenterServer
-	
+
 )
 
 BEGIN {
 	# define variables/functions
-	
+
 	#Requires -Version 3
-	
+
 	$colFinalResults = @()
 	$ErrorActionPreference = [System.Management.Automation.ActionPreference]::Stop
-	
+
 } # end BEGIN
 
 PROCESS {
@@ -87,7 +85,7 @@ PROCESS {
 		- Grab current virtual port group the guest is using
 		- Grab current vSwitch the VM is running on
 		#>
-			
+
 			$getvm = $null
 			$vmconfig = $null
 			$vihost = $null
@@ -96,16 +94,16 @@ PROCESS {
 			$currentvpg = $null
 			$CurrentVswitch = $null
 			$objVMGenes = @()
-			
+
 			Write-Verbose -Message "Querying for guest geneology"
-			
+
 			$GetVM = Get-VM -Name $vm
 			$VMConfig = ($GetVM | Get-View).config
 			$VIHost = $GetVM | Get-VMHost
 			$ClusterDetail = $VIHost | Get-Cluster | Get-View
 			$CurrentVPG = $GetVM | Get-VirtualPortGroup
 			$CurrentVswitch = $GetVM | Get-VirtualSwitch
-			
+
 			$objVMGenes = [PSCustomObject] @{
 				VM = $VMConfig.Name
 				CurrentHost = $GetVM.VMHost
@@ -116,18 +114,18 @@ PROCESS {
 				PortGroupVLAN = $CurrentVPG.VLanId
 				vSwitch = $CurrentVswitch.Name
 			} # end objVMGenes
-			
+
 			$colFinalResults += $objVMGenes
-			
+
 		} catch {
 			Write-Warning -Message "$_"
 		} # end try/catch
 	} # end foreach $vm in $name
-	
+
 } # end PROCESS
 
 END {
 	Write-Verbose -Message "Calling final results"
-	
+
 	$colFinalResults
 } # end END
